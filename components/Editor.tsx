@@ -6,6 +6,7 @@ interface EditorProps {
   chapter: Chapter | undefined;
   onChange: (text: string) => void;
   onUpdateSummary: (text: string) => void;
+  onUpdateTitle: (text: string) => void; // Added for editable title
   mode: AppMode;
   onWriteChapter: (mode: 'full' | 'outline') => void;
   isGenerating: boolean;
@@ -15,6 +16,7 @@ const Editor: React.FC<EditorProps> = ({
   chapter,
   onChange, 
   onUpdateSummary,
+  onUpdateTitle,
   mode, 
   onWriteChapter,
   isGenerating 
@@ -46,10 +48,8 @@ const Editor: React.FC<EditorProps> = ({
                 <input 
                     type="text" 
                     value={chapter.title}
-                    onChange={(e) => {
-                        // Handled by parent theoretically
-                    }}
-                    className="bg-transparent text-slate-200 font-bold text-sm outline-none placeholder:text-slate-600"
+                    onChange={(e) => onUpdateTitle(e.target.value)}
+                    className="bg-transparent text-slate-200 font-bold text-sm outline-none placeholder:text-slate-600 focus:text-white transition-colors"
                     placeholder="Chapter Title"
                 />
                 <span className="text-[10px] text-slate-500 font-mono">

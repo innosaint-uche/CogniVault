@@ -1,172 +1,141 @@
 import { GoogleGenAI } from "@google/genai";
 import { SearchResult, BookConfig, Chapter } from "../types";
+import { AIServiceProvider, constructSystemPrompt } from "./aiService";
 
 // Safe access to process.env for browser environments
 const getApiKey = () => {
   try {
-    return (typeof process !== 'undefined' && process.env?.API_KEY) || '';
+    // Check localStorage first for user override
+    const localKey = localStorage.getItem('GEMINI_API_KEY');
+    if (localKey) return localKey;
+
+    return (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env?.API_KEY) || '';
   } catch (e) {
     return '';
   }
 };
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+export class GeminiProvider implements AIServiceProvider {
+  name = "Google Gemini";
+  private ai: GoogleGenAI;
 
-const SYSTEM_PROMPT = `You are the Neural Link for CogniVault Studio. 
-Your goal is to assist the user in writing by strictly using the provided context.
-- If context is provided, prioritize it over your internal knowledge.
-- Maintain the user's tone and style.
-- Be concise and professional.
-`;
+  constructor() {
+    this.ai = new GoogleGenAI({ apiKey: getApiKey() });
+  }
 
-export const expandText = async (
-  currentText: string,
-  context: SearchResult[]
-): Promise<string> => {
-  try {
-    const contextString = context
-      .map((r, i) => `[Source ${i + 1}: ${r.docTitle}]\n${r.chunk.content}`)
+  // Update instance if key changes (though usually requires reload or re-instantiation)
+  updateKey() {
+    this.ai = new GoogleGenAI({ apiKey: getApiKey() });
+  }
+
+  async generateOutline(
+    bookConfig: BookConfig,
+    sourceContext: string,
+    chapterCount: number
+  ): Promise<Array<{ title: string; summary: string }>> {
+    const prompt = `
+      You are an expert ${bookConfig.projectType} architect specializing in ${bookConfig.projectSubtype}.
+
+      PROJECT DETAILS:
+      Title: ${bookConfig.title}
+      Type: ${bookConfig.projectType} - ${bookConfig.projectSubtype}
+      Genre: ${bookConfig.genre}
+      Tone: ${bookConfig.tone}
+      Perspective: ${bookConfig.perspective}
+      Background Info: ${bookConfig.background}
+
+      SOURCE MATERIAL SUMMARY:
+      ${sourceContext.substring(0, 10000)}
+
+      TASK:
+      Create a detailed outline with exactly ${chapterCount} sections/chapters.
+      Return ONLY a JSON array of objects. Each object must have:
+      - "title": string (Creative title)
+      - "summary": string (Instruction for what happens in this section, referencing the source material where relevant)
+
+      Do not wrap in markdown code blocks. Just the raw JSON string.
+    `;
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          systemInstruction: constructSystemPrompt(bookConfig)
+        }
+      });
+
+      const text = response.text || "[]";
+      return JSON.parse(text);
+    } catch (error) {
+      console.error("Outline Generation Error:", error);
+      throw new Error("Failed to generate outline.");
+    }
+  }
+
+  async writeChapter(
+    chapter: Chapter,
+    bookConfig: BookConfig,
+    relevantSources: SearchResult[],
+    previousChapterContext: string,
+    generateMode: 'full' | 'outline' = 'full'
+  ): Promise<string> {
+    const sourceText = relevantSources
+      .map((r, i) => `[Fact ${i + 1} from ${r.docTitle}]: ${r.chunk.content}`)
       .join("\n\n");
 
     const prompt = `
-Context Data:
-${contextString}
+      You are an expert ${bookConfig.projectType} writer specializing in ${bookConfig.projectSubtype}.
 
-Current Draft:
-${currentText}
+      GLOBAL CONFIGURATION:
+      Title: ${bookConfig.title}
+      Type: ${bookConfig.projectType} - ${bookConfig.projectSubtype}
+      Genre: ${bookConfig.genre}
+      Tone/Atmosphere: ${bookConfig.tone}
+      Perspective: ${bookConfig.perspective}
+      Background Context: ${bookConfig.background}
 
-Task: Write the next logical paragraph for the "Current Draft" using the "Context Data" provided above. Do not repeat the last sentence of the draft.
-`;
+      PREVIOUS CONTEXT (The content so far):
+      ${previousChapterContext}
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.7,
-      }
-    });
+      SOURCE MATERIAL TO INCORPORATE (Strictly adhere to these facts):
+      ${sourceText}
 
-    return response.text || "";
-  } catch (error) {
-    console.error("Neural Link Error:", error);
-    throw new Error("Failed to connect to Neural Link.");
+      CURRENT SECTION INSTRUCTIONS:
+      Title: ${chapter.title}
+      Requirements: ${chapter.summary}
+
+      TASK:
+      ${generateMode === 'outline'
+        ? `Create a detailed beat-sheet or scene outline for this section.
+           - Break down into 3-5 distinct parts.
+           - Highlight key points and flow.
+           - Explicitly note where specific SOURCE MATERIAL facts should be integrated.
+           - Do not write the full prose yet. Format as a structured list.`
+        : `Write the FULL CONTENT for this section.
+           - Target Word Count: Approximately 1000 words (do not exceed 1200).
+           - Focus deeply on the voice and perspective defined in the config.
+           - Seamlessly weave in the provided Source Material facts.
+           - Adopt the requested tone (${bookConfig.tone}).
+           - Do not output the title, just the text body.`}
+    `;
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          maxOutputTokens: 8192,
+          temperature: generateMode === 'outline' ? 0.7 : 0.85,
+          systemInstruction: constructSystemPrompt(bookConfig)
+        }
+      });
+
+      return response.text || "";
+    } catch (error) {
+      console.error("Chapter Generation Error:", error);
+      throw new Error("Failed to write chapter.");
+    }
   }
-};
-
-/**
- * Generates a book outline based on uploaded documents and user prompt
- */
-export const generateOutline = async (
-  bookConfig: BookConfig,
-  sourceContext: string,
-  chapterCount: number
-): Promise<Array<{ title: string; summary: string }>> => {
-  const prompt = `
-    You are an expert book architect.
-    
-    BOOK DETAILS:
-    Title: ${bookConfig.title}
-    Genre: ${bookConfig.genre}
-    Tone: ${bookConfig.tone}
-    Perspective: ${bookConfig.perspective}
-    Background Info: ${bookConfig.background}
-
-    SOURCE MATERIAL SUMMARY:
-    ${sourceContext.substring(0, 10000)}
-
-    TASK:
-    Create a detailed chapter outline with exactly ${chapterCount} chapters.
-    Return ONLY a JSON array of objects. Each object must have:
-    - "title": string (Creative chapter title)
-    - "summary": string (Instruction for what happens in this chapter, referencing the source material where relevant)
-    
-    Do not wrap in markdown code blocks. Just the raw JSON string.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const text = response.text || "[]";
-    return JSON.parse(text);
-  } catch (error) {
-    console.error("Outline Generation Error:", error);
-    throw new Error("Failed to generate outline.");
-  }
-};
-
-/**
- * Writes a specific chapter based on config, relevant sources, and chapter instructions
- * Supports 'full' prose generation or 'outline' suggestions.
- */
-export const writeChapter = async (
-  chapter: Chapter,
-  bookConfig: BookConfig,
-  relevantSources: SearchResult[],
-  previousChapterContext: string,
-  generateMode: 'full' | 'outline' = 'full'
-): Promise<string> => {
-  
-  const sourceText = relevantSources
-    .map((r, i) => `[Fact ${i + 1} from ${r.docTitle}]: ${r.chunk.content}`)
-    .join("\n\n");
-
-  const prompt = `
-    You are an expert ghostwriter and editor.
-
-    GLOBAL BOOK CONFIGURATION:
-    Title: ${bookConfig.title}
-    Genre: ${bookConfig.genre}
-    Tone/Atmosphere: ${bookConfig.tone}
-    Perspective: ${bookConfig.perspective}
-    Background Context: ${bookConfig.background}
-
-    PREVIOUS CHAPTER CONTEXT (The story so far):
-    ${previousChapterContext}
-
-    SOURCE MATERIAL TO INCORPORATE (Strictly adhere to these facts):
-    ${sourceText}
-
-    CURRENT CHAPTER INSTRUCTIONS:
-    Title: ${chapter.title}
-    Plot/Requirements: ${chapter.summary}
-
-    TASK:
-    ${generateMode === 'outline' 
-      ? `Create a detailed beat-sheet or scene outline for this chapter. 
-         - Break down the chapter into 3-5 distinct scenes.
-         - Highlight key emotional beats, character decisions, and plot progressions.
-         - Explicitly note where specific SOURCE MATERIAL facts should be integrated.
-         - Suggest specific dialogue lines or sensory details to include later.
-         - Do not write the full prose yet. Format as a structured list.` 
-      : `Write the FULL PROSE content for this chapter. 
-         - Target Word Count: Approximately 1000 words (do not exceed 1200).
-         - Focus deeply on the emotions and perspective defined in the config.
-         - Seamlessly weave in the provided Source Material facts.
-         - Adopt the requested tone (${bookConfig.tone}).
-         - Do not output the title, just the story text.`}
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        maxOutputTokens: 8192, // High token limit for long chapters
-        temperature: generateMode === 'outline' ? 0.7 : 0.85 // Higher creativity for prose
-      }
-    });
-
-    return response.text || "";
-  } catch (error) {
-    console.error("Chapter Generation Error:", error);
-    throw new Error("Failed to write chapter.");
-  }
-};
+}
