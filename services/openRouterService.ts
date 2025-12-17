@@ -1,8 +1,11 @@
 import { SearchResult, BookConfig, Chapter } from "../types";
-import { AIServiceProvider, SYSTEM_PROMPT } from "./aiService";
+import { AIServiceProvider, constructSystemPrompt } from "./aiService";
 
 const getApiKey = () => {
   try {
+    const localKey = localStorage.getItem('OPENROUTER_API_KEY');
+    if (localKey) return localKey;
+
     return (typeof process !== 'undefined' && process.env?.OPENROUTER_API_KEY) || '';
   } catch (e) {
     return '';
@@ -42,7 +45,7 @@ export class OpenRouterProvider implements AIServiceProvider {
 
   private async callOpenRouter(messages: any[], jsonMode: boolean = false): Promise<string> {
     if (!this.apiKey) {
-      throw new Error("OpenRouter API Key is missing.");
+      throw new Error("OpenRouter API Key is missing. Please add it in Settings.");
     }
 
     try {
@@ -82,10 +85,11 @@ export class OpenRouterProvider implements AIServiceProvider {
     chapterCount: number
   ): Promise<Array<{ title: string; summary: string }>> {
     const prompt = `
-      You are an expert book architect.
+      You are an expert ${bookConfig.projectType} architect specializing in ${bookConfig.projectSubtype}.
 
-      BOOK DETAILS:
+      PROJECT DETAILS:
       Title: ${bookConfig.title}
+      Type: ${bookConfig.projectType} - ${bookConfig.projectSubtype}
       Genre: ${bookConfig.genre}
       Tone: ${bookConfig.tone}
       Perspective: ${bookConfig.perspective}
@@ -95,23 +99,23 @@ export class OpenRouterProvider implements AIServiceProvider {
       ${sourceContext.substring(0, 10000)}
 
       TASK:
-      Create a detailed chapter outline with exactly ${chapterCount} chapters.
+      Create a detailed outline with exactly ${chapterCount} sections/chapters.
       Return ONLY a JSON array of objects under the key "chapters". Each object must have:
-      - "title": string (Creative chapter title)
-      - "summary": string (Instruction for what happens in this chapter, referencing the source material where relevant)
+      - "title": string (Creative title)
+      - "summary": string (Instruction for what happens in this section, referencing the source material where relevant)
 
       Example JSON format:
       {
         "chapters": [
-          { "title": "Chapter 1", "summary": "..." },
-          { "title": "Chapter 2", "summary": "..." }
+          { "title": "Section 1", "summary": "..." },
+          { "title": "Section 2", "summary": "..." }
         ]
       }
     `;
 
     try {
       const result = await this.callOpenRouter([
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: constructSystemPrompt(bookConfig) },
         { role: "user", content: prompt }
       ], true);
 
@@ -145,44 +149,44 @@ export class OpenRouterProvider implements AIServiceProvider {
       .join("\n\n");
 
     const prompt = `
-      You are an expert ghostwriter and editor.
+      You are an expert ${bookConfig.projectType} writer specializing in ${bookConfig.projectSubtype}.
 
-      GLOBAL BOOK CONFIGURATION:
+      GLOBAL CONFIGURATION:
       Title: ${bookConfig.title}
+      Type: ${bookConfig.projectType} - ${bookConfig.projectSubtype}
       Genre: ${bookConfig.genre}
       Tone/Atmosphere: ${bookConfig.tone}
       Perspective: ${bookConfig.perspective}
       Background Context: ${bookConfig.background}
 
-      PREVIOUS CHAPTER CONTEXT (The story so far):
+      PREVIOUS CONTEXT (The content so far):
       ${previousChapterContext}
 
       SOURCE MATERIAL TO INCORPORATE (Strictly adhere to these facts):
       ${sourceText}
 
-      CURRENT CHAPTER INSTRUCTIONS:
+      CURRENT SECTION INSTRUCTIONS:
       Title: ${chapter.title}
-      Plot/Requirements: ${chapter.summary}
+      Requirements: ${chapter.summary}
 
       TASK:
       ${generateMode === 'outline'
-        ? `Create a detailed beat-sheet or scene outline for this chapter.
-           - Break down the chapter into 3-5 distinct scenes.
-           - Highlight key emotional beats, character decisions, and plot progressions.
+        ? `Create a detailed beat-sheet or scene outline for this section.
+           - Break down into 3-5 distinct parts.
+           - Highlight key points and flow.
            - Explicitly note where specific SOURCE MATERIAL facts should be integrated.
-           - Suggest specific dialogue lines or sensory details to include later.
            - Do not write the full prose yet. Format as a structured list.`
-        : `Write the FULL PROSE content for this chapter.
+        : `Write the FULL CONTENT for this section.
            - Target Word Count: Approximately 1000 words (do not exceed 1200).
-           - Focus deeply on the emotions and perspective defined in the config.
+           - Focus deeply on the voice and perspective defined in the config.
            - Seamlessly weave in the provided Source Material facts.
            - Adopt the requested tone (${bookConfig.tone}).
-           - Do not output the title, just the story text.`}
+           - Do not output the title, just the text body.`}
     `;
 
     try {
       return await this.callOpenRouter([
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: constructSystemPrompt(bookConfig) },
         { role: "user", content: prompt }
       ]);
     } catch (error) {

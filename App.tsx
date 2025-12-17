@@ -17,7 +17,9 @@ const DEFAULT_BOOK_CONFIG: BookConfig = {
   tone: "Serious, Analytical",
   background: "",
   perspective: "Third Person Limited",
-  aiProvider: 'google'
+  aiProvider: 'google',
+  projectType: 'book',
+  projectSubtype: 'Fiction (Novel)'
 };
 
 function App() {
@@ -162,10 +164,33 @@ function App() {
     ));
   };
 
+  const handleUpdateChapterTitle = (text: string) => {
+    if (!activeChapterId) return;
+    setChapters(prev => prev.map(c =>
+      c.id === activeChapterId ? { ...c, title: text } : c
+    ));
+  };
+
   const handleAddChapter = () => {
+    // Find the highest "Chapter N" to increment efficiently
+    // This allows users to have "Intro" and "Preface" and then "Chapter 1"
+
+    let maxChapterNum = 0;
+    const chapterRegex = /^Chapter\s+(\d+)$/i;
+
+    chapters.forEach(c => {
+        const match = c.title.match(chapterRegex);
+        if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxChapterNum) {
+                maxChapterNum = num;
+            }
+        }
+    });
+
     const newChapter: Chapter = {
       id: crypto.randomUUID(),
-      title: `Chapter ${chapters.length + 1}`,
+      title: `Chapter ${maxChapterNum + 1}`,
       summary: "",
       content: "",
       wordCount: 0,
@@ -351,6 +376,7 @@ function App() {
                 chapter={activeChapter} 
                 onChange={handleUpdateChapterContent} 
                 onUpdateSummary={handleUpdateChapterSummary}
+                onUpdateTitle={handleUpdateChapterTitle}
                 mode={mode}
                 onWriteChapter={handleWriteChapter}
                 isGenerating={isGenerating}

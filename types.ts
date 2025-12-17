@@ -1,6 +1,24 @@
 export type AppMode = 'logic' | 'neural';
 export type AIProviderName = 'google' | 'openrouter';
 
+// Project Types
+export type ProjectType = 'blog' | 'book' | 'other';
+
+export const PROJECT_TYPES: Record<ProjectType, { label: string; subtypes: string[] }> = {
+  blog: {
+    label: "Blog / Article",
+    subtypes: ["Tech", "Entertainment", "Critic / Review", "Opinion Piece", "News", "Tutorial"]
+  },
+  book: {
+    label: "Book / Long-form",
+    subtypes: ["Fiction (Novel)", "Non-Fiction", "Business Research", "White Paper", "Academic Journal", "Educational"]
+  },
+  other: {
+    label: "Other",
+    subtypes: ["General", "Screenplay", "Poetry", "Speech"]
+  }
+};
+
 export interface Chunk {
   id: string;
   docId: string;
@@ -46,6 +64,10 @@ export interface BookConfig {
   perspective: string; // e.g., "First Person (Protagonist)", "Third Person Omniscient"
   aiProvider: AIProviderName; // 'google' or 'openrouter'
   openRouterModel?: string; // e.g. "google/gemini-2.0-flash-lite-preview-02-05:free"
+
+  // New Fields
+  projectType: ProjectType;
+  projectSubtype: string;
 }
 
 export const MOCK_DOCS: Document[] = [
