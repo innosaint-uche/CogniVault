@@ -48,7 +48,11 @@ function App() {
     if (!id) {
       id = crypto.randomUUID();
       const newUrl = `${window.location.pathname}?project=${id}`;
-      window.history.replaceState({}, '', newUrl);
+      try {
+        window.history.replaceState({}, '', newUrl);
+      } catch (e) {
+        console.warn("Could not update URL history (likely running in sandbox):", e);
+      }
     }
     setProjectId(id);
 
