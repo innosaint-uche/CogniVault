@@ -275,8 +275,13 @@ function App() {
 
   if (isProjectLoading) {
       return (
-          <div className="flex h-screen w-screen bg-[#0f172a] items-center justify-center flex-col gap-4">
-              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin"></div>
+          <div
+            className="flex h-screen w-screen bg-[#0f172a] items-center justify-center flex-col gap-4"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading application"
+          >
+              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" aria-hidden="true"></div>
               <p className="text-emerald-500 font-mono text-sm animate-pulse">Establishing Secure Uplink...</p>
           </div>
       )
@@ -316,11 +321,16 @@ function App() {
                </span>
                
                {/* Sync Indicator */}
-               <div className="flex items-center gap-2 px-2 py-1 bg-slate-900 rounded border border-slate-800" title={`Project ID: ${projectId}`}>
-                   {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-                   {syncStatus === 'syncing' && <RotateCw className="w-3 h-3 text-blue-500 animate-spin" />}
-                   {syncStatus === 'error' && <CloudOff className="w-3 h-3 text-red-500" />}
-                   {syncStatus === 'offline' && <CloudOff className="w-3 h-3 text-slate-500" />}
+               <div
+                   className="flex items-center gap-2 px-2 py-1 bg-slate-900 rounded border border-slate-800"
+                   title={`Project ID: ${projectId}`}
+                   role="status"
+                   aria-label={`Sync Status: ${syncStatus}`}
+                >
+                   {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-emerald-500" aria-hidden="true" />}
+                   {syncStatus === 'syncing' && <RotateCw className="w-3 h-3 text-blue-500 animate-spin" aria-hidden="true" />}
+                   {syncStatus === 'error' && <CloudOff className="w-3 h-3 text-red-500" aria-hidden="true" />}
+                   {syncStatus === 'offline' && <CloudOff className="w-3 h-3 text-slate-500" aria-hidden="true" />}
                    <span className="text-[10px] text-slate-500 font-mono hidden md:block">
                         {syncStatus === 'offline' ? 'OFFLINE MODE' : (syncStatus === 'syncing' ? 'SYNCING...' : 'SAVED')}
                    </span>
@@ -332,6 +342,7 @@ function App() {
                     onClick={copyProjectId}
                     className="hidden md:flex text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400 hover:text-white border border-slate-700"
                     title="Click to copy Project ID to share or resume later"
+                    aria-label={`Copy Project ID: ${projectId}`}
                 >
                     ID: {projectId.slice(0, 8)}...
                 </button>
@@ -340,31 +351,34 @@ function App() {
                     onClick={() => setIsSettingsOpen(true)}
                     className="p-2 text-slate-500 hover:text-white transition-colors"
                     title="Project Settings"
+                    aria-label="Project Settings"
                 >
-                    <Settings className="w-5 h-5" />
+                    <Settings className="w-5 h-5" aria-hidden="true" />
                 </button>
 
-                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800" role="group" aria-label="Application Mode">
                     <button
                         onClick={() => setMode('logic')}
+                        aria-pressed={mode === 'logic'}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                             mode === 'logic' 
                             ? 'bg-emerald-500/10 text-emerald-400 shadow-sm shadow-emerald-900/20' 
                             : 'text-slate-500 hover:text-slate-300'
                         }`}
                     >
-                        <Shield className="w-3 h-3" />
+                        <Shield className="w-3 h-3" aria-hidden="true" />
                         LOGIC CORE
                     </button>
                     <button
                         onClick={() => setMode('neural')}
+                        aria-pressed={mode === 'neural'}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                             mode === 'neural' 
                             ? 'bg-cyan-500/10 text-cyan-400 shadow-sm shadow-cyan-900/20' 
                             : 'text-slate-500 hover:text-slate-300'
                         }`}
                     >
-                        <Zap className="w-3 h-3" />
+                        <Zap className="w-3 h-3" aria-hidden="true" />
                         NEURAL LINK
                     </button>
                 </div>
