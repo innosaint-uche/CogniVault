@@ -1,4 +1,5 @@
 export type AppMode = 'logic' | 'neural';
+export type AIProviderName = 'google' | 'openrouter';
 
 export interface Chunk {
   id: string;
@@ -43,6 +44,8 @@ export interface BookConfig {
   tone: string; // e.g., "Dark, Gritty", "Optimistic"
   background: string; // World building, character backstories
   perspective: string; // e.g., "First Person (Protagonist)", "Third Person Omniscient"
+  aiProvider: AIProviderName; // 'google' or 'openrouter'
+  openRouterModel?: string; // e.g. "google/gemini-2.0-flash-lite-preview-02-05:free"
 }
 
 export const MOCK_DOCS: Document[] = [

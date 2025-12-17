@@ -5,7 +5,7 @@ import Editor from './components/Editor';
 import SettingsModal from './components/SettingsModal';
 import { Document, AppMode, SearchResult, MOCK_DOCS, Chapter, BookConfig } from './types';
 import { chunkText, performSearch } from './services/logicCore';
-import { generateOutline, writeChapter } from './services/geminiService';
+import { getAIProvider } from './services/providerFactory';
 import { saveProjectDebounced, subscribeToProject, ProjectState } from './services/syncService';
 import { Shield, Zap, Settings, Cloud, CloudOff, CheckCircle2, RotateCw } from 'lucide-react';
 import { db } from './firebaseConfig';
@@ -16,7 +16,8 @@ const DEFAULT_BOOK_CONFIG: BookConfig = {
   targetAudience: "Adult",
   tone: "Serious, Analytical",
   background: "",
-  perspective: "Third Person Limited"
+  perspective: "Third Person Limited",
+  aiProvider: 'google'
 };
 
 function App() {
@@ -184,7 +185,8 @@ function App() {
     
     setIsGenerating(true);
     try {
-        const outline = await generateOutline(bookConfig, sourceContext, 20); 
+        const provider = getAIProvider(bookConfig);
+        const outline = await provider.generateOutline(bookConfig, sourceContext, 20);
         const newChapters: Chapter[] = outline.map((o, idx) => ({
             id: crypto.randomUUID(),
             title: o.title,
@@ -195,8 +197,8 @@ function App() {
         }));
         setChapters(newChapters);
         if (newChapters.length > 0) setActiveChapterId(newChapters[0].id);
-    } catch (e) {
-        alert("Failed to generate outline.");
+    } catch (e: any) {
+        alert(`Failed to generate outline: ${e.message}`);
     } finally {
         setIsGenerating(false);
     }
@@ -215,7 +217,8 @@ function App() {
 
         const specificContext = performSearch(`${activeChapter.title} ${activeChapter.summary}`, documents);
 
-        const text = await writeChapter(activeChapter, bookConfig, specificContext, prevContext, writeMode);
+        const provider = getAIProvider(bookConfig);
+        const text = await provider.writeChapter(activeChapter, bookConfig, specificContext, prevContext, writeMode);
         
         if (activeChapter.content.trim() && writeMode === 'outline') {
             const separator = "\n\n--- SUGGESTED OUTLINE ---\n";
@@ -227,8 +230,8 @@ function App() {
         if (writeMode === 'full') {
             setChapters(prev => prev.map(c => c.id === activeChapterId ? { ...c, status: 'complete' } : c));
         }
-    } catch (e) {
-        alert("Failed to write chapter.");
+    } catch (e: any) {
+        alert(`Failed to write chapter: ${e.message}`);
     } finally {
         setIsGenerating(false);
     }

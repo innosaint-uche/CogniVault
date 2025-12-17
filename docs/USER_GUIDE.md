@@ -15,15 +15,30 @@ CogniVault Studio is divided into three main areas:
     -   Privacy is maximized; no data leaves your browser (unless Firebase sync is enabled).
 
 -   **NEURAL LINK**:
-    -   Connects to Google's Gemini AI.
+    -   Connects to Cloud AI (Google Gemini or OpenRouter).
     -   Enables AI features like "Auto Outline", "Suggest Outline", and "Write Prose".
-    -   **Note**: Requires a valid `GEMINI_API_KEY`.
+    -   **Note**: Requires valid API keys in `.env.local`.
+
+## AI Providers
+
+You can switch between AI providers in the **Settings** menu.
+
+### 1. Google Gemini (Default)
+-   Uses Google's official SDK.
+-   Fast and reliable.
+-   Requires `GEMINI_API_KEY`.
+
+### 2. OpenRouter (Multi-Model / Free Tier)
+-   Allows access to a wide range of models including Llama 3, Mistral, and Qwen.
+-   **Free Radar**: The app comes pre-configured with a list of free/cheap models to help you stay within budget.
+-   Select specific models from the dropdown in Settings.
+-   Requires `OPENROUTER_API_KEY`.
 
 ## Workflow
 
 1.  **Project Setup**:
     -   Click the **Settings** (gear icon) in the top right to configure your book's Title, Genre, Tone, and Background.
-    -   This context is crucial for the AI to generate relevant content.
+    -   Select your preferred **Neural Link Provider**.
 
 2.  **Ingest Sources**:
     -   In the Sidebar, switch to the **Sources** tab.
@@ -50,4 +65,4 @@ CogniVault Studio is divided into three main areas:
 ## Saving
 
 -   If **Firebase** is configured, changes are saved automatically ("Syncing..." -> "Saved").
--   If **Offline**, data is held in memory (and potentially lost on reload if not persistent - *Note: LocalStorage persistence is not currently implemented in the base version, so be careful to save your work manually or configure Firebase*).
+-   If **Offline**, data is held in memory.

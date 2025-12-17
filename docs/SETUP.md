@@ -22,11 +22,17 @@ Ensure you have the following installed:
 3.  **Environment Configuration**:
     Create a `.env.local` file in the root of the project. This file is ignored by git and will store your sensitive keys.
 
-    **Required for Neural Mode:**
+    **Required for Neural Mode (Choose at least one):**
+
+    *Option A: Google Gemini (Direct)*
     ```env
     GEMINI_API_KEY=your_google_gemini_api_key
     ```
-    *You can get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey).*
+
+    *Option B: OpenRouter (Aggregator - supports free models)*
+    ```env
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    ```
 
     **Optional for Syncing:**
     If you want to use Firebase for saving your project state:
