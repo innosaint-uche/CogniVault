@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Document, Chapter } from '../types';
+import { Document, Chapter, ProjectType } from '../types';
 import { FileText, Upload, Trash2, Plus, Database, Code, List, BookOpen, Sparkles, CheckCircle2, Circle } from 'lucide-react';
 
 interface SidebarProps {
@@ -12,6 +12,15 @@ interface SidebarProps {
   onAddChapter: () => void;
   onGenerateOutline: () => void;
   isGenerating: boolean;
+  projectType: ProjectType;
+}
+
+const getUnitLabel = (type: ProjectType) => {
+    switch(type) {
+        case 'blog': return 'Section';
+        case 'other': return 'Part';
+        default: return 'Chapter';
+    }
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -23,7 +32,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectChapter,
   onAddChapter,
   onGenerateOutline,
-  isGenerating
+  isGenerating,
+  projectType
 }) => {
   const [tab, setTab] = useState<'sources' | 'outline'>('outline');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +50,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       default: return <FileText className="w-4 h-4 text-blue-400" />;
     }
   };
+
+  const unitLabel = getUnitLabel(projectType);
 
   return (
     <div className="h-full w-72 bg-slate-950 border-r border-slate-800 flex flex-col shrink-0">
@@ -127,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         onClick={onAddChapter}
                         className="flex items-center justify-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 rounded-md transition-colors text-xs font-medium border border-slate-700"
                     >
-                        <Plus className="w-3 h-3" /> Add Chapter
+                        <Plus className="w-3 h-3" /> Add {unitLabel}
                     </button>
                     <button
                         onClick={onGenerateOutline}
@@ -152,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             <div className="flex items-center gap-2">
                                 <span className="font-mono text-xs text-slate-500 w-5">{(idx + 1).toString().padStart(2, '0')}</span>
                                 <span className={`text-sm font-medium truncate flex-1 ${activeChapterId === chapter.id ? 'text-white' : 'text-slate-300'}`}>
-                                    {chapter.title || "Untitled Chapter"}
+                                    {chapter.title || `Untitled ${unitLabel}`}
                                 </span>
                                 {chapter.status === 'complete' ? (
                                     <CheckCircle2 className="w-3 h-3 text-emerald-500" />

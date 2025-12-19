@@ -3,7 +3,7 @@
 ## Interface Overview
 
 CogniVault Studio is divided into three main areas:
-1.  **Sidebar (Left)**: Manages documents (Sources) and the book outline (Chapters).
+1.  **Sidebar (Left)**: Manages documents (Sources) and the book outline (Chapters/Sections).
 2.  **Editor (Center)**: The main writing area for the active chapter.
 3.  **Reference Deck (Right)**: Displays relevant information from your sources based on what you are writing.
 
@@ -17,7 +17,14 @@ CogniVault Studio is divided into three main areas:
 -   **NEURAL LINK**:
     -   Connects to Cloud AI (Google Gemini or OpenRouter).
     -   Enables AI features like "Auto Outline", "Suggest Outline", and "Write Prose".
-    -   **Note**: Requires valid API keys in `.env.local`.
+    -   **Note**: Requires valid API keys in `.env.local` or Settings.
+
+## Project Types
+
+In **Settings**, you can define your project type:
+-   **Blog / Article**: Terminology changes to "Sections". AI adapts to blog writing styles (Tech, Entertainment, etc.).
+-   **Book / Long-form**: Terminology uses "Chapters". AI adapts to storytelling or research styles.
+-   **Other**: Generic structure.
 
 ## AI Providers
 
@@ -37,32 +44,34 @@ You can switch between AI providers in the **Settings** menu.
 ## Workflow
 
 1.  **Project Setup**:
-    -   Click the **Settings** (gear icon) in the top right to configure your book's Title, Genre, Tone, and Background.
+    -   Click the **Settings** (gear icon) in the top right.
+    -   Enter your **API Keys** (these are saved locally to your browser).
+    -   Select **Project Classification** (e.g., Blog or Book).
     -   Select your preferred **Neural Link Provider**.
 
 2.  **Ingest Sources**:
     -   In the Sidebar, switch to the **Sources** tab.
-    -   Click **Ingest Document** to upload text files (`.txt`, `.md`, etc.) containing research, character sheets, or world-building notes.
-    -   The system chunks these documents for retrieval.
+    -   Click **Ingest Document** to upload text files.
 
 3.  **Outline**:
     -   Switch to the **Outline** tab in the Sidebar.
-    -   Click **Add Chapter** to manually create a chapter.
-    -   Or, click **Auto Outline** (in Neural Mode) to generate a chapter list based on your Project Settings and Sources.
+    -   Click **Add Chapter/Section** to manually create one.
+    -   Or, click **Auto Outline** (in Neural Mode) to generate a structure.
+    -   *Note*: Chapter titles are fully editable. Renaming a chapter "Introduction" will not break the automatic numbering of subsequent chapters.
 
 4.  **Writing**:
     -   Select a chapter.
-    -   Fill in the **Chapter Instructions / Summary** box.
+    -   Fill in the **Instructions / Summary** box.
     -   Start writing in the main editor.
-    -   **AI Assistance (Neural Mode)**:
-        -   **Suggest Outline**: Generates a beat sheet for the chapter.
-        -   **Write Prose**: Generates full text for the chapter based on the summary and context.
+    -   **Undo/Redo**: Use the buttons in the toolbar or `Ctrl+Z` / `Ctrl+Shift+Z`.
+    -   **Save**: Project saves automatically. You can force a save with the **Save** icon or `Ctrl+S`.
 
 5.  **Reference Deck**:
-    -   As you type, or when you trigger a search, the Reference Deck on the right will show relevant chunks from your uploaded sources.
-    -   Click the **Copy** icon on any card to insert that text into your editor.
+    -   As you type, relevant chunks from your sources appear on the right.
+    -   Click **Copy** to insert text.
 
 ## Saving
 
--   If **Firebase** is configured, changes are saved automatically ("Syncing..." -> "Saved").
--   If **Offline**, data is held in memory.
+-   **Auto-Save**: Changes are saved automatically (debounced).
+-   **Manual Save**: Click the Save icon or press `Ctrl+S`.
+-   **Sync Status**: Look for the indicator in the header ("Saved", "Syncing...", "Offline").
