@@ -1,15 +1,28 @@
 import React, { useRef, useEffect } from 'react';
-import { AppMode, Chapter } from '../types';
-import { Wand2, Loader2, Bot, ListTree } from 'lucide-react';
+import { AppMode, Chapter, ProjectType } from '../types';
+import { Wand2, Loader2, Bot, ListTree, Undo, Redo } from 'lucide-react';
 
 interface EditorProps {
   chapter: Chapter | undefined;
   onChange: (text: string) => void;
   onUpdateSummary: (text: string) => void;
-  onUpdateTitle: (text: string) => void; // Added for editable title
+  onUpdateTitle: (text: string) => void;
   mode: AppMode;
   onWriteChapter: (mode: 'full' | 'outline') => void;
   isGenerating: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  projectType: ProjectType;
+}
+
+const getUnitLabel = (type: ProjectType) => {
+    switch(type) {
+        case 'blog': return 'Section';
+        case 'other': return 'Part';
+        default: return 'Chapter';
+    }
 }
 
 const Editor: React.FC<EditorProps> = ({ 
@@ -19,7 +32,12 @@ const Editor: React.FC<EditorProps> = ({
   onUpdateTitle,
   mode, 
   onWriteChapter,
-  isGenerating 
+  isGenerating,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  projectType
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -35,7 +53,7 @@ const Editor: React.FC<EditorProps> = ({
       return (
           <div className="flex-1 flex flex-col items-center justify-center bg-[#0f172a] text-slate-500">
               <Bot className="w-16 h-16 mb-4 opacity-20" />
-              <p>Select a chapter from the outline to begin writing.</p>
+              <p>Select a {getUnitLabel(projectType).toLowerCase()} from the outline to begin writing.</p>
           </div>
       )
   }
@@ -50,7 +68,7 @@ const Editor: React.FC<EditorProps> = ({
                     value={chapter.title}
                     onChange={(e) => onUpdateTitle(e.target.value)}
                     className="bg-transparent text-slate-200 font-bold text-sm outline-none placeholder:text-slate-600 focus:text-white transition-colors"
-                    placeholder="Chapter Title"
+                    placeholder={`${getUnitLabel(projectType)} Title`}
                 />
                 <span className="text-[10px] text-slate-500 font-mono">
                     {chapter.content.split(/\s+/).filter(w => w.length > 0).length} words / ~1000 target
@@ -58,13 +76,33 @@ const Editor: React.FC<EditorProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+                 {/* Undo/Redo Group */}
+                 <div className="flex items-center gap-1 mr-4 border-r border-slate-800 pr-4">
+                    <button
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        className={`p-1.5 rounded hover:bg-slate-800 transition-colors ${!canUndo ? 'text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-white'}`}
+                        title="Undo (Ctrl+Z)"
+                    >
+                        <Undo className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={onRedo}
+                        disabled={!canRedo}
+                        className={`p-1.5 rounded hover:bg-slate-800 transition-colors ${!canRedo ? 'text-slate-700 cursor-not-allowed' : 'text-slate-400 hover:text-white'}`}
+                        title="Redo (Ctrl+Shift+Z)"
+                    >
+                        <Redo className="w-4 h-4" />
+                    </button>
+                 </div>
+
                 {mode === 'neural' ? (
                     <>
                         <button 
                             onClick={() => onWriteChapter('outline')}
                             disabled={isGenerating}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all bg-slate-800 text-cyan-300 hover:bg-slate-700 border border-slate-700 hover:border-cyan-800"
-                            title="Generate chapter beats & suggestions"
+                            title="Generate beats & suggestions"
                         >
                             {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ListTree className="w-3 h-3" />}
                             Suggest Outline
@@ -73,7 +111,7 @@ const Editor: React.FC<EditorProps> = ({
                             onClick={() => onWriteChapter('full')}
                             disabled={isGenerating}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all bg-cyan-900/30 text-cyan-300 hover:bg-cyan-900/50 border border-cyan-800"
-                            title="Write full chapter content"
+                            title="Write full content"
                         >
                             {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
                             Write Prose
@@ -95,12 +133,12 @@ const Editor: React.FC<EditorProps> = ({
         <div className="max-w-3xl mx-auto min-h-[500px] space-y-6">
             {/* Chapter Instructions Block */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2 block">Chapter Instructions / Summary</label>
+                <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2 block">{getUnitLabel(projectType)} Instructions / Summary</label>
                 <textarea 
                     value={chapter.summary}
                     onChange={(e) => onUpdateSummary(e.target.value)}
                     className="w-full bg-transparent text-sm text-slate-400 outline-none resize-none h-20 placeholder:text-slate-700"
-                    placeholder="Describe what happens in this chapter..."
+                    placeholder={`Describe what happens in this ${getUnitLabel(projectType).toLowerCase()}...`}
                 />
             </div>
 
@@ -108,7 +146,7 @@ const Editor: React.FC<EditorProps> = ({
                 ref={textareaRef}
                 value={chapter.content}
                 onChange={(e) => onChange(e.target.value)}
-                placeholder="Chapter content will appear here..."
+                placeholder="Start writing..."
                 className="w-full min-h-[500px] bg-transparent border-none outline-none resize-none text-slate-200 text-lg leading-relaxed placeholder:text-slate-700 font-light font-serif"
                 spellCheck={false}
             />

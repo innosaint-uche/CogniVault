@@ -28,11 +28,22 @@ export class GeminiProvider implements AIServiceProvider {
     this.ai = new GoogleGenAI({ apiKey: getApiKey() });
   }
 
+  private checkKey() {
+      const key = getApiKey();
+      if (!key) {
+          throw new Error("Gemini API Key is missing. Please configure it in Settings.");
+      }
+      // Re-instantiate if needed to ensure key is fresh
+      this.ai = new GoogleGenAI({ apiKey: key });
+  }
+
   async generateOutline(
     bookConfig: BookConfig,
     sourceContext: string,
     chapterCount: number
   ): Promise<Array<{ title: string; summary: string }>> {
+    this.checkKey();
+
     const prompt = `
       You are an expert ${bookConfig.projectType} architect specializing in ${bookConfig.projectSubtype}.
 
@@ -68,8 +79,12 @@ export class GeminiProvider implements AIServiceProvider {
 
       const text = response.text || "[]";
       return JSON.parse(text);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Outline Generation Error:", error);
+      // Propagate friendly error
+      if (error.message && error.message.includes("403")) {
+          throw new Error("Access Denied (403). Please check your Gemini API Key.");
+      }
       throw error;
     }
   }
@@ -81,6 +96,8 @@ export class GeminiProvider implements AIServiceProvider {
     previousChapterContext: string,
     generateMode: 'full' | 'outline' = 'full'
   ): Promise<string> {
+    this.checkKey();
+
     const sourceText = relevantSources
       .map((r, i) => `[Fact ${i + 1} from ${r.docTitle}]: ${r.chunk.content}`)
       .join("\n\n");
@@ -133,8 +150,11 @@ export class GeminiProvider implements AIServiceProvider {
       });
 
       return response.text || "";
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chapter Generation Error:", error);
+      if (error.message && error.message.includes("403")) {
+          throw new Error("Access Denied (403). Please check your Gemini API Key.");
+      }
       throw error;
     }
   }
