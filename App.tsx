@@ -3,12 +3,13 @@ import Sidebar from './components/Sidebar';
 import ReferenceDeck from './components/ReferenceDeck';
 import Editor from './components/Editor';
 import SettingsModal from './components/SettingsModal';
+import Dashboard from './components/Dashboard';
 import { Document, AppMode, SearchResult, MOCK_DOCS, Chapter, BookConfig } from './types';
 import { chunkText, performSearch } from './services/logicCore';
 import { getAIProvider } from './services/providerFactory';
-import { saveProjectDebounced, subscribeToProject, ProjectState } from './services/syncService';
-import { Shield, Zap, Settings, Cloud, CloudOff, CheckCircle2, RotateCw, Save } from 'lucide-react';
-import { db } from './firebaseConfig';
+import { saveProjectLocal, loadProjectLocal } from './services/storageService';
+import { parseFile } from './services/documentParser';
+import { Shield, Zap, Settings, CheckCircle2, RotateCw, Save, ArrowLeft } from 'lucide-react';
 import { useHistory } from './hooks/useHistory';
 
 const DEFAULT_BOOK_CONFIG: BookConfig = {
@@ -24,10 +25,10 @@ const DEFAULT_BOOK_CONFIG: BookConfig = {
 };
 
 function App() {
-  // Project & Sync State
-  const [projectId, setProjectId] = useState<string>("");
-  const [syncStatus, setSyncStatus] = useState<'saved' | 'syncing' | 'error' | 'offline'>('offline');
-  const [isProjectLoading, setIsProjectLoading] = useState(true);
+  // Project State
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [isProjectLoading, setIsProjectLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
 
   // App State
   const [mode, setMode] = useState<AppMode>('logic');
@@ -41,8 +42,7 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Undo/Redo hook (tracks chapters array to support global state undo)
-  // For a production app, we might want per-chapter undo, but for now global content undo is better than nothing
+  // Undo/Redo hook
   const {
     state: historyChapters,
     set: setHistoryChapters,
@@ -53,88 +53,92 @@ function App() {
     reset: resetHistory
   } = useHistory<Chapter[]>([]);
 
-  // Update history only when active chapter content changes significantly or on blur?
-  // Tracking every keystroke is too heavy. Let's wrap setChapters to update history.
-  // Actually, standard practice for text editors is complex.
-  // Simplified approach: Capture snapshot on 'blur' or debounced.
-
-  // For this implementation, we will track the *active chapter* changes.
-  // But wait, if we switch chapters, we lose history context if we don't design carefully.
-  // Let's keep it simple: History tracks the *entire* chapters array.
-  // We need to debounce history updates to avoid 1-char steps.
-
-  const updateChaptersWithHistory = useCallback((newChapters: Chapter[], immediateHistory = false) => {
-    setChapters(newChapters);
-    // In a real app we'd debounce this setHistoryChapters call
-    // For now, let's just assume explicit actions or large edits will trigger it
-  }, []);
-
   const activeChapter = chapters.find(c => c.id === activeChapterId);
 
-  // Initialize Project ID and Sync
+  // Load Project Logic
   useEffect(() => {
-    // Check URL for project ID
-    const params = new URLSearchParams(window.location.search);
-    let id = params.get('project');
+    const initProject = async () => {
+        const params = new URLSearchParams(window.location.search);
+        const urlId = params.get('project');
 
-    if (!id) {
-      id = crypto.randomUUID();
-      const newUrl = `${window.location.pathname}?project=${id}`;
+        if (urlId) {
+            setProjectId(urlId);
+            await loadProjectData(urlId);
+        }
+    };
+    initProject();
+  }, []);
+
+  const loadProjectData = async (id: string) => {
+      setIsProjectLoading(true);
       try {
-        window.history.replaceState({}, '', newUrl);
+          const data = await loadProjectLocal(id);
+          if (data) {
+              setBookConfig(data.bookConfig);
+              setChapters(data.chapters);
+              setDocuments(data.documents);
+              resetHistory(data.chapters);
+          } else {
+              // Project ID in URL but not in DB? Treat as new or error?
+              // For now, treat as new empty project to avoid blocking
+              console.warn("Project not found in local DB, starting fresh.");
+              setDocuments(MOCK_DOCS); // Optional: keep mock docs for demo
+          }
       } catch (e) {
-        console.warn("Could not update URL history (likely running in sandbox):", e);
+          console.error("Failed to load project", e);
+      } finally {
+          setIsProjectLoading(false);
       }
-    }
-    setProjectId(id);
+  };
 
-    // If Firebase is configured, subscribe to updates
-    if (db) {
-        setSyncStatus('syncing');
-        const unsubscribe = subscribeToProject(id, (data) => {
-            setBookConfig(data.bookConfig || DEFAULT_BOOK_CONFIG);
-            if (data.chapters) {
-                setChapters(data.chapters);
-                resetHistory(data.chapters); // Reset history on load to avoid undoing into empty state
-            }
-            if (data.documents) setDocuments(data.documents);
-            
-            setIsProjectLoading(false);
-            setSyncStatus('saved');
-        });
+  const handleCreateProject = () => {
+      const newId = crypto.randomUUID();
+      setProjectId(newId);
+      setBookConfig(DEFAULT_BOOK_CONFIG);
+      setChapters([]);
+      setDocuments([]); // Start empty
+      resetHistory([]);
 
-        setTimeout(() => {
-            setIsProjectLoading((loading) => {
-                if (loading) {
-                    setDocuments(MOCK_DOCS);
-                }
-                return false;
-            });
-        }, 1500);
+      // Update URL
+      const newUrl = `${window.location.pathname}?project=${newId}`;
+      window.history.pushState({}, '', newUrl);
+  };
 
-        return () => unsubscribe();
-    } else {
-        setSyncStatus('offline');
-        setDocuments(MOCK_DOCS);
-        setIsProjectLoading(false);
-        resetHistory([]);
-    }
-  }, []); // resetHistory is stable
+  const handleOpenProject = (id: string) => {
+      setProjectId(id);
+      const newUrl = `${window.location.pathname}?project=${id}`;
+      window.history.pushState({}, '', newUrl);
+      loadProjectData(id);
+  };
 
-  // Sync Data Effect
+  const handleBackToDashboard = () => {
+      setProjectId(null);
+      // clear URL param
+      window.history.pushState({}, '', window.location.pathname);
+  };
+
+  // Auto-Save Effect
   useEffect(() => {
-    if (!projectId || isProjectLoading || !db) return;
+    if (!projectId || isProjectLoading) return;
 
-    saveProjectDebounced(projectId, {
-        bookConfig,
-        chapters,
-        documents
-    }, setSyncStatus);
+    const timer = setTimeout(() => {
+        setSaveStatus('saving');
+        saveProjectLocal(projectId, {
+            bookConfig,
+            chapters,
+            documents
+        }).then(() => {
+            setSaveStatus('saved');
+        }).catch(err => {
+            console.error("Save failed", err);
+            setSaveStatus('unsaved');
+        });
+    }, 2000); // 2s debounce
 
+    return () => clearTimeout(timer);
   }, [bookConfig, chapters, documents, projectId, isProjectLoading]);
 
-
-  // Debounced search for context
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!activeChapter || !activeChapter.summary) {
@@ -144,7 +148,6 @@ function App() {
 
       setIsSearching(true);
       const query = `${activeChapter.title} ${activeChapter.summary} ${activeChapter.content.slice(-200)}`;
-      
       const results = performSearch(query, documents);
       setSearchResults(results);
       setIsSearching(false);
@@ -159,66 +162,30 @@ function App() {
           if (chapters.length > 0) {
             setHistoryChapters(chapters);
           }
-      }, 1000); // Save snapshot 1s after user stops typing
+      }, 1000);
       return () => clearTimeout(timer);
   }, [chapters, setHistoryChapters]);
 
-  // Handle Undo/Redo
-  const handleUndo = () => {
-      undo();
-      if (canUndo && historyChapters) {
-          setChapters(historyChapters); // This causes a loop if not careful.
-          // Actually useHistory returns the *present* state.
-          // But our useHistory hook is a bit manual.
-      }
-  };
-
-  // Improved History Implementation:
-  // The useHistory hook manages 'state' (which is 'present').
-  // When we call 'undo', 'state' updates to the past.
-  // We need to sync that back to 'chapters'.
-
-  useEffect(() => {
-      // If historyChapters changes (due to undo/redo), update chapters
-      // But we need to distinguish between "User typed" (which pushes to history)
-      // and "User pressed Undo" (which reads from history)
-      // This simple two-way bind is tricky.
-
-      // Let's stick to the manual approach:
-      // user types -> setChapters -> useEffect debounce -> setHistory(chapters)
-      // user undo -> undo() -> (history hook updates internal state) -> we need to read it?
-      // Actually the hook returns 'state' which IS the current history head.
-
-      // So:
-      // if (historyChapters !== chapters) setChapters(historyChapters);
-      // But this would overwrite user typing immediately if the debounce hasn't fired.
-
-      // Refined Plan:
-      // Pass the *active chapter* text to a useHistory hook inside Editor, not global.
-      // Global undo is confusing for a multi-chapter book.
-      // Changing Plan: Undo/Redo will be handled inside Editor.tsx or locally for the active chapter.
-  }, [historyChapters]);
-
 
   const handleUpload = async (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      const newDocId = crypto.randomUUID();
-      const newChunks = chunkText(text, newDocId);
-      
-      const newDoc: Document = {
-        id: newDocId,
-        title: file.name,
-        type: file.name.endsWith('.js') || file.name.endsWith('.ts') ? 'code' : 'text',
-        content: text,
-        chunks: newChunks,
-        uploadedAt: Date.now()
-      };
+    try {
+        const { content, metadata } = await parseFile(file);
+        const newDocId = crypto.randomUUID();
+        const newChunks = chunkText(content, newDocId);
 
-      setDocuments(prev => [...prev, newDoc]);
-    };
-    reader.readAsText(file);
+        const newDoc: Document = {
+            id: newDocId,
+            title: file.name,
+            type: 'text', // Simplified type
+            content: content,
+            chunks: newChunks,
+            uploadedAt: Date.now()
+        };
+
+        setDocuments(prev => [...prev, newDoc]);
+    } catch (e) {
+        alert(`Error parsing file: ${e}`);
+    }
   };
 
   const handleDeleteDoc = (id: string) => {
@@ -230,6 +197,7 @@ function App() {
     setChapters(prev => prev.map(c => 
       c.id === activeChapterId ? { ...c, content: text, wordCount: text.split(/\s+/).length } : c
     ));
+    setSaveStatus('unsaved');
   };
 
   const handleUpdateChapterSummary = (text: string) => {
@@ -237,6 +205,7 @@ function App() {
     setChapters(prev => prev.map(c => 
       c.id === activeChapterId ? { ...c, summary: text } : c
     ));
+    setSaveStatus('unsaved');
   };
 
   const handleUpdateChapterTitle = (text: string) => {
@@ -244,10 +213,10 @@ function App() {
     setChapters(prev => prev.map(c =>
       c.id === activeChapterId ? { ...c, title: text } : c
     ));
+    setSaveStatus('unsaved');
   };
 
   const handleAddChapter = () => {
-    // Relaxed regex to catch "Chapter 1", "Chapter 1:", "Chapter 1 - Title"
     const chapterRegex = /^Chapter\s+(\d+)/i;
     let maxChapterNum = 0;
 
@@ -341,24 +310,17 @@ function App() {
     }
   };
 
-  const copyProjectId = () => {
-    navigator.clipboard.writeText(projectId);
-    alert("Project ID copied to clipboard!");
-  };
-
   // Manual Save Handler
   const handleManualSave = useCallback(() => {
-      if (!projectId || !db) return;
-      setSyncStatus('syncing');
-      // Force immediate save logic here (or just reuse debounce with 0 wait if we refactored)
-      // Since we use a debounced function from services, calling it again essentially resets timer.
-      // We need a non-debounced version for immediate feedback, or just accept the debounce.
-      // For UX, let's update status and call the debounced function.
-      saveProjectDebounced(projectId, {
+      if (!projectId) return;
+      setSaveStatus('saving');
+      saveProjectLocal(projectId, {
         bookConfig,
         chapters,
         documents
-      }, setSyncStatus);
+      }).then(() => {
+          setSaveStatus('saved');
+      });
   }, [projectId, bookConfig, chapters, documents]);
 
   // Keyboard Shortcuts
@@ -368,9 +330,6 @@ function App() {
             e.preventDefault();
             handleManualSave();
         }
-        // Undo/Redo shortcuts handled in Editor or globally?
-        // Let's implement global Undo/Redo logic here if we decide to wire it up properly.
-        // For now, focusing on Save.
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -388,6 +347,16 @@ function App() {
               <p className="text-emerald-500 font-mono text-sm animate-pulse">Establishing Secure Uplink...</p>
           </div>
       )
+  }
+
+  // Determine View
+  if (!projectId) {
+      return (
+          <Dashboard
+            onSelectProject={handleOpenProject}
+            onCreateProject={handleCreateProject}
+          />
+      );
   }
 
   return (
@@ -417,6 +386,22 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-6 shrink-0">
             <div className="flex items-center gap-4">
+               {/* Back Button */}
+               <button
+                onClick={handleBackToDashboard}
+                className="p-1 hover:bg-slate-800 rounded transition-colors"
+                title="Back to Dashboard"
+               >
+                   <div className="flex items-center gap-2">
+                       <div className="w-6 h-6 flex items-center justify-center bg-emerald-500/20 rounded">
+                           <ArrowLeft className="w-4 h-4 text-emerald-500" />
+                       </div>
+                       <span className="font-bold text-emerald-500">CogniVault</span>
+                   </div>
+               </button>
+
+               <div className="h-6 w-px bg-slate-800 mx-2"></div>
+
                <span className="text-sm font-medium text-slate-400 truncate max-w-[200px]">
                 {bookConfig.title} 
                 <span className="opacity-50 mx-2">/</span> 
@@ -424,18 +409,12 @@ function App() {
                </span>
                
                {/* Sync Indicator */}
-               <div
-                   className="flex items-center gap-2 px-2 py-1 bg-slate-900 rounded border border-slate-800"
-                   title={`Project ID: ${projectId}`}
-                   role="status"
-                   aria-label={`Sync Status: ${syncStatus}`}
-                >
-                   {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-emerald-500" aria-hidden="true" />}
-                   {syncStatus === 'syncing' && <RotateCw className="w-3 h-3 text-blue-500 animate-spin" aria-hidden="true" />}
-                   {syncStatus === 'error' && <CloudOff className="w-3 h-3 text-red-500" aria-hidden="true" />}
-                   {syncStatus === 'offline' && <CloudOff className="w-3 h-3 text-slate-500" aria-hidden="true" />}
-                   <span className="text-[10px] text-slate-500 font-mono hidden md:block">
-                        {syncStatus === 'offline' ? 'OFFLINE MODE' : (syncStatus === 'syncing' ? 'SYNCING...' : 'SAVED')}
+               <div className="flex items-center gap-2 px-2 py-1 bg-slate-900 rounded border border-slate-800" title={`Project ID: ${projectId}`}>
+                   {saveStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                   {saveStatus === 'saving' && <RotateCw className="w-3 h-3 text-blue-500 animate-spin" />}
+                   {saveStatus === 'unsaved' && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                   <span className="text-[10px] text-slate-500 font-mono hidden md:block uppercase">
+                        {saveStatus}
                    </span>
                </div>
             </div>
@@ -447,15 +426,6 @@ function App() {
                     title="Save Project (Ctrl+S)"
                 >
                     <Save className="w-5 h-5" />
-                </button>
-
-                <button 
-                    onClick={copyProjectId}
-                    className="hidden md:flex text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400 hover:text-white border border-slate-700"
-                    title="Click to copy Project ID to share or resume later"
-                    aria-label={`Copy Project ID: ${projectId}`}
-                >
-                    ID: {projectId.slice(0, 8)}...
                 </button>
 
                 <button 
@@ -501,9 +471,7 @@ function App() {
                 chapter={activeChapter} 
                 onChange={(text) => {
                     handleUpdateChapterContent(text);
-                    // Pass to history logic
-                    setHistoryChapters(chapters); // We need to pass the NEW state. This is still tricky in this component structure.
-                    // Given the constraint, we will rely on the debounce effect for history for now.
+                    setHistoryChapters(chapters);
                 }}
                 onUpdateSummary={handleUpdateChapterSummary}
                 onUpdateTitle={handleUpdateChapterTitle}
@@ -513,11 +481,8 @@ function App() {
                 canUndo={canUndo}
                 canRedo={canRedo}
                 onUndo={() => {
-                    undo();
-                    // We need to apply the undone state
-                    // This requires the history hook to drive the state, or we subscribe to it.
-                    // In the render: state from useHistory is `historyChapters`.
-                    // We need an effect: if historyChapters changes AND it wasn't triggered by our set, apply it.
+                   undo();
+                   // Wait for useEffect
                 }}
                 onRedo={redo}
                 projectType={bookConfig.projectType}
