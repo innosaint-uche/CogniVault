@@ -265,7 +265,14 @@ function App() {
         setChapters(newChapters);
         if (newChapters.length > 0) setActiveChapterId(newChapters[0].id);
     } catch (e: any) {
-        alert(`Failed to generate outline: ${e.message}`);
+        const msg = e.message || e.toString();
+        if (msg.includes('403') || msg.includes('API Key') || msg.includes('unregistered callers')) {
+             if (confirm("Neural Link Access Denied: Missing or invalid API Key.\n\nWould you like to open Settings to configure it?")) {
+                 setIsSettingsOpen(true);
+             }
+        } else {
+             alert(`Failed to generate outline: ${msg}`);
+        }
     } finally {
         setIsGenerating(false);
     }
@@ -298,7 +305,14 @@ function App() {
             setChapters(prev => prev.map(c => c.id === activeChapterId ? { ...c, status: 'complete' } : c));
         }
     } catch (e: any) {
-        alert(`Failed to write chapter: ${e.message}`);
+        const msg = e.message || e.toString();
+        if (msg.includes('403') || msg.includes('API Key') || msg.includes('unregistered callers')) {
+             if (confirm("Neural Link Access Denied: Missing or invalid API Key.\n\nWould you like to open Settings to configure it?")) {
+                 setIsSettingsOpen(true);
+             }
+        } else {
+             alert(`Failed to write chapter: ${msg}`);
+        }
     } finally {
         setIsGenerating(false);
     }
