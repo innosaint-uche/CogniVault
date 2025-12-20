@@ -39,8 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onUpload(e.target.files[0]);
+    if (e.target.files) {
+      Array.from(e.target.files).forEach(file => onUpload(file));
     }
   };
 
@@ -98,7 +98,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
-                    accept=".txt,.md,.js,.ts,.tsx,.json"
+                    multiple
+                    accept=".txt,.md,.js,.ts,.tsx,.json,.pdf,.docx,.xlsx,.xls"
                     onChange={handleFileChange}
                     />
                 </div>
