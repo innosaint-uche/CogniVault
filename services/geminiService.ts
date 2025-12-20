@@ -70,7 +70,7 @@ export class GeminiProvider implements AIServiceProvider {
       return JSON.parse(text);
     } catch (error) {
       console.error("Outline Generation Error:", error);
-      throw new Error("Failed to generate outline.");
+      throw error;
     }
   }
 
@@ -135,7 +135,7 @@ export class GeminiProvider implements AIServiceProvider {
       return response.text || "";
     } catch (error) {
       console.error("Chapter Generation Error:", error);
-      throw new Error("Failed to write chapter.");
+      throw error;
     }
   }
 }

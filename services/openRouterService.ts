@@ -133,7 +133,7 @@ export class OpenRouterProvider implements AIServiceProvider {
       }
     } catch (error) {
       console.error("Outline Generation Error:", error);
-      throw new Error("Failed to generate outline via OpenRouter.");
+      throw error;
     }
   }
 
@@ -191,7 +191,7 @@ export class OpenRouterProvider implements AIServiceProvider {
       ]);
     } catch (error) {
       console.error("Chapter Generation Error:", error);
-      throw new Error("Failed to write chapter via OpenRouter.");
+      throw error;
     }
   }
 }
