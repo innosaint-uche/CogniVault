@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, memo } from 'react';
 import { Document, Chapter, ProjectType } from '../types';
 import { FileText, Upload, Trash2, Plus, Database, Code, List, BookOpen, Sparkles, CheckCircle2, Circle } from 'lucide-react';
 
@@ -21,6 +21,39 @@ const getUnitLabel = (type: ProjectType) => {
         case 'other': return 'Part';
         default: return 'Chapter';
     }
+}
+
+// Custom comparison function for React.memo
+// This optimization prevents Sidebar re-renders when chapter CONTENT changes (e.g., typing in editor)
+// We only re-render if metadata (title, status, summary) changes or if other props change.
+function areSidebarPropsEqual(prev: SidebarProps, next: SidebarProps) {
+  // Check primitive and simple props first
+  if (prev.activeChapterId !== next.activeChapterId) return false;
+  if (prev.isGenerating !== next.isGenerating) return false;
+  if (prev.projectType !== next.projectType) return false;
+  if (prev.documents !== next.documents) return false; // Documents array ref check is sufficient
+
+  // Check chapters array
+  if (prev.chapters === next.chapters) return true; // Same ref means no change
+  if (prev.chapters.length !== next.chapters.length) return false; // Different length means added/removed
+
+  // Deep check chapter metadata (title, status, summary, id)
+  // We ignore 'content' and 'wordCount' changes as they don't affect Sidebar appearance
+  for (let i = 0; i < prev.chapters.length; i++) {
+    const p = prev.chapters[i];
+    const n = next.chapters[i];
+
+    if (p.id !== n.id) return false;
+    if (p.title !== n.title) return false;
+    if (p.status !== n.status) return false;
+    if (p.summary !== n.summary) return false;
+  }
+
+  // Ignore function props (onUpload, etc.) assuming they are stable in behavior
+  // even if their reference changes due to closure updates in parent.
+  // This is safe because Sidebar only uses them as event handlers.
+
+  return true;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -202,4 +235,4 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 };
 
-export default Sidebar;
+export default memo(Sidebar, areSidebarPropsEqual);
