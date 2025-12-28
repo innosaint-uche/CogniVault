@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('CogniVault Studio Settings', () => {
   test('should allow switching AI providers', async ({ page }) => {
     await page.goto('/');
+    await page.getByRole('button', { name: 'New Project' }).click();
 
     // Open settings
     await page.getByRole('button', { name: 'Project Settings' }).click();
@@ -21,7 +22,6 @@ test.describe('CogniVault Studio Settings', () => {
     await expect(page.getByText('OpenRouter Model')).toBeVisible();
 
     // Select a model - target specific select for model which is the second one or finding by label nearby
-    // Since there are two selects now (Subtype and Model), use more specific locator
     const modelSelect = page.locator('select').nth(1); // 0 is subtype, 1 is model
     await modelSelect.selectOption({ label: 'mistralai/mistral-7b-instruct:free' });
 
