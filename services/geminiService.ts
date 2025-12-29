@@ -7,9 +7,9 @@ const getApiKey = () => {
   try {
     // Check localStorage first for user override
     const localKey = localStorage.getItem('GEMINI_API_KEY');
-    if (localKey) return localKey;
+    if (localKey) return localKey.trim();
 
-    return (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env?.API_KEY) || '';
+    return ((typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env?.API_KEY) || '').trim();
   } catch (e) {
     return '';
   }
@@ -80,11 +80,10 @@ export class GeminiProvider implements AIServiceProvider {
       const text = response.text || "[]";
       return JSON.parse(text);
     } catch (error: any) {
-      console.error("Outline Generation Error:", error);
-      // Propagate friendly error
-      if (error.message && error.message.includes("403")) {
+      if (error.message && (error.message.includes("403") || error.message.includes("API Key") || error.message.includes("unregistered caller"))) {
           throw new Error("Access Denied (403). Please check your Gemini API Key.");
       }
+      console.error("Outline Generation Error:", error);
       throw error;
     }
   }
@@ -151,10 +150,10 @@ export class GeminiProvider implements AIServiceProvider {
 
       return response.text || "";
     } catch (error: any) {
-      console.error("Chapter Generation Error:", error);
-      if (error.message && error.message.includes("403")) {
+      if (error.message && (error.message.includes("403") || error.message.includes("API Key") || error.message.includes("unregistered caller"))) {
           throw new Error("Access Denied (403). Please check your Gemini API Key.");
       }
+      console.error("Chapter Generation Error:", error);
       throw error;
     }
   }

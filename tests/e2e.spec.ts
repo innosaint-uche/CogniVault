@@ -1,20 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('CogniVault Studio E2E', () => {
-  test('should load the application and display the default state', async ({ page }) => {
+  test('should load the application and display the dashboard', async ({ page }) => {
     await page.goto('/');
 
-    // Check for title
+    // Check for dashboard title
     await expect(page).toHaveTitle(/CogniVault Studio/);
+    await expect(page.getByText('Studio v1.1')).toBeVisible();
+    await expect(page.getByText('New Project')).toBeVisible();
+  });
 
+  test('should create a new project and verify default state', async ({ page }) => {
+    await page.goto('/');
+
+    // Create new project
+    await page.getByRole('button', { name: 'New Project' }).click();
+
+    // Now we should be in the editor view
     // Check for main heading in Sidebar
     await expect(page.getByRole('heading', { name: 'CogniVault' })).toBeVisible();
 
     // Check default mode is Logic Core
     await expect(page.getByRole('button', { name: 'LOGIC CORE' })).toBeVisible();
 
-    // Check Outline tab is active by default (class check)
-    // Use exact match to avoid matching "Auto Outline"
+    // Check Outline tab is active by default
     const outlineTab = page.getByRole('button', { name: 'Outline', exact: true });
     await expect(outlineTab).toBeVisible();
     await expect(outlineTab).toHaveClass(/text-emerald-400/);
@@ -22,6 +31,7 @@ test.describe('CogniVault Studio E2E', () => {
 
   test('should create a new chapter', async ({ page }) => {
     await page.goto('/');
+    await page.getByRole('button', { name: 'New Project' }).click();
 
     // Check initial state
     await expect(page.getByText('Project is empty.')).toBeVisible();
@@ -42,6 +52,7 @@ test.describe('CogniVault Studio E2E', () => {
 
   test('should switch modes', async ({ page }) => {
       await page.goto('/');
+      await page.getByRole('button', { name: 'New Project' }).click();
 
       const logicBtn = page.getByRole('button', { name: 'LOGIC CORE' });
       const neuralBtn = page.getByRole('button', { name: 'NEURAL LINK' });
@@ -57,6 +68,7 @@ test.describe('CogniVault Studio E2E', () => {
 
   test('should switch tabs in sidebar', async ({ page }) => {
       await page.goto('/');
+      await page.getByRole('button', { name: 'New Project' }).click();
 
       const sourcesTab = page.getByRole('button', { name: 'Sources' });
 
